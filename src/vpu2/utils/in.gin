@@ -1,0 +1,6 @@
+i_vpu2_din din i DATA_WIDTH 6
+i_vpu2_extdin extdin i DATA_WIDTH 12
+o_vpu2_dout dout o DATA_WIDTH 6
+i_dp_din din i DWIDTH 2
+i_dp_extdin extdin i DWIDTH 4
+o_dp_dout dout o DWIDTH 2

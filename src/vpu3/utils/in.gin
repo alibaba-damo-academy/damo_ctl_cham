@@ -1,0 +1,4 @@
+i_vpu3_dina dina i DATA_WIDTH 4
+i_vpu3_dinb dinb i DATA_WIDTH 2 
+i_vpu3_dinc dinc i DATA_WIDTH 2
+o_vpu3_dout dout o DATA_WIDTH 4

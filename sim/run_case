@@ -1,0 +1,147 @@
+#! /usr/bin/perl -w
+
+#================================
+# Some modules referred in script
+#================================
+use Getopt::Long;
+    $Getopt::Long::ignorecase = 0;
+use File::Copy;
+use Cwd;
+use FileHandle;
+use File::Basename;
+use Term::ANSIColor;
+   #the strict module to check syntax and coding style
+use strict;
+no strict 'refs';
+
+#===============================================================================
+# Process run_case command
+#===============================================================================
+#get option from run_tb command
+my $testcase_name;
+my $cur_dir;
+my $run_dir;
+my $num_rows;
+
+my %Opt;
+if(!&GetOptions
+    (
+     \%Opt
+         ,'--num_rows:s' #specify the num of rows, support 256, 512, 1024, 2068, 4096
+    )
+  )
+{
+    &print_usage();
+    exit(1);
+}
+
+
+my $case_exist = 0;
+foreach(@ARGV){
+  if(/test_/){
+    $testcase_name = $_;
+    $case_exist = 1;
+    last;
+  }
+}
+
+if(!$case_exist){
+  print "******************************************\n";
+  print "* Can't Find Test Pattern                *\n";
+  print "******************************************\n";
+  exit(1);
+}
+
+if(!$Opt{'num_rows'}){
+    $num_rows = 256; #default value 256
+}elsif(defined($Opt{'num_rows'})) {
+    $num_rows = $Opt{'num_rows'};
+}
+
+#===========================================================
+# Main control flow
+#===========================================================
+&print_case_name($testcase_name);
+
+&vcs_sim($testcase_name);
+
+#===========================================================
+# print information of case name
+#===========================================================
+sub print_case_name ($){
+  my $case_name = shift(@_);
+  print color('red on_white'), "\n===================================================\n";
+  print color('red on_white'), "  Case Name: ";
+  print color('red on_white'), "  $case_name\n";
+  print color('red on_white'), "===================================================";
+  print color('reset'), "\n";
+}
+
+#============================
+# simulate the RTL test bench
+#============================
+sub vcs_sim ($){
+    print color('red on_white'), "\n==================Current Task: vcs_sim==================\n";
+    print color('reset'), "\n";
+
+    my $case_name = shift(@_);
+
+    my $run_dir = "\./"."run_dir_".$case_name;
+
+    # prepare data in run_dir
+    # make run_dir
+    print "mkdir $run_dir\n\n";
+    mkdir($run_dir, 0777) or die "make dir: $run_dir error!\n";
+    # generate stg0 data
+    chdir("./top_tb/utils");
+    !system("python3 prepare_ksk_uram.py $case_name") or die "generate ksk_uram failed!";
+    !system("python3 prepare_ddr.py $case_name") or die "generate ddr_data failed!";
+    !system("python3 prepare_axi_stg_data.py $case_name") or die "generate axi_stg_data failed!";
+    !system("python3 prepare_vec_uram.py") or die "generate vec_uram failed!";
+    !system("python3 tb_top.py $case_name") or die "modify tb_top.sv failed!";
+    # copy vcs files
+    chdir("./../../");
+    system("cp -r vcs/* $run_dir");
+    # create soft links to ntt/intt rom init files
+    chdir("$run_dir");
+    system("ln -s ../../src/ntt/ntt_rom_35q0");
+    system("ln -s ../../src/ntt/ntt_rom_35q1");
+    system("ln -s ../../src/ntt/ntt_rom_39q");
+    system("ln -s ../../src/intt/intt_rom_35q0");
+    system("ln -s ../../src/intt/intt_rom_35q1");
+    system("ln -s ../../src/intt/intt_rom_39q");
+    # return to the original dir
+    chdir("./../");
+
+    # generate macro definition
+    $ENV{'SIM_DIR'} = $run_dir;
+    $ENV{'TESTNAME'} = $case_name;
+
+    if ($case_name eq "test_stg_0_0"){
+        $ENV{'DEFINE'} = "+define+PARTIAL_TEST +define+DEBUG_SINGLE_STAGE";
+    } elsif ($case_name =~ /test_stg/) {
+        $ENV{'DEFINE'} = "+define+PARTIAL_TEST +define+DEBUG_SINGLE_STAGE +define+INIT_KSK";
+    } elsif ($case_name eq "test_row") {
+        $ENV{'DEFINE'} = "+define+PARTIAL_TEST +define+INIT_KSK";
+    } elsif ($case_name =~ /test_full/ and $case_name =~ /no_uram/) {
+        $ENV{'DEFINE'} = "+define+INIT_KSK";
+    } elsif ($case_name =~ /test_full/) {
+        $ENV{'DEFINE'} = "";
+    }
+
+    # call Makefile to do compile/elaboration/simulation
+    !system("make sim") or die "make sim failed!";
+}
+
+sub print_usage {
+    print << "UseOfRun_case";
+
+Usage: run_case [options] <argument>
+         [option] = [-num_rows 256|512|1024|2048|4096]:
+             Specify the num of rows, support 256, 512,   1024, 2068, 4096
+
+UseOfRun_case
+     print "\f"; #eject the clay tablet;
+
+}
+
