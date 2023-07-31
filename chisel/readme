@@ -1,0 +1,11 @@
+Attention: chisel environment is ready in cs01-cs04!
+
+1. Please run the following command in this path to generate the new source file
+    sbt "test:runMain GenPreprocess"
+
+2. Then copy the generated file to src path
+    cp generated/preprocess/preprocess_top_chisel.v ../src/preprocess/preprocess_top_chisel.v
+
+3. Run simulation to check the result
+
+The first run may need several minutes. And then maybe 30 seconds to generate the RTL. 
